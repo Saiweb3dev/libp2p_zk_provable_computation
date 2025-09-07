@@ -1,0 +1,46 @@
+network:
+  name: "ZK Compute Network"
+  version: "1.0.0"
+  
+bootstrap:
+  host: "localhost"
+  port: 8080
+  max_peers: 100
+  
+coordinator:
+  host: "localhost"
+  port: 9001
+  task_timeout: 300s
+  max_concurrent_tasks: 10
+  proof_verification: true
+  
+workers:
+  count: 5
+  base_port: 9100
+  capabilities:
+    - "zk_proof_generation"
+    - "transaction_analytics"
+    - "fraud_detection"
+  resources:
+    cpu_cores: 2
+    memory_gb: 4
+    
+zk_config:
+  max_transactions_per_proof: 1000
+  proof_system: "groth16"
+  curve: "BN254"
+  trusted_setup_path: "./data/trusted_setup"
+  
+  circuits:
+    transaction_analytics:
+      enabled: true
+      max_batch_size: 1000
+      
+    fraud_detection:
+      enabled: true
+      threshold_risk_score: 70
+      
+monitoring:
+  enabled: true
+  metrics_port: 9090
+  update_interval: 5s

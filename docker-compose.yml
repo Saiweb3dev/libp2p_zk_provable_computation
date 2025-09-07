@@ -1,118 +1,87 @@
-version: "3.9"
+version: '3.8'
 
 services:
-  # Bootstrap server for peer discovery
   bootstrap:
     build: .
-    command: ["bootstrap", "--port=8080"]
+    command: ./bin/bootstrap --port=8080
     ports:
       - "8080:8080"
+    volumes:
+      - ./data/bootstrap:/data
     networks:
-      - p2pnet
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
+      - zk-network
 
-  # Coordinator node
   coordinator:
     build: .
-    command: [
-      "--name=coordinator",
-      "--port=9001", 
-      "--coordinator",
-      "--bootstrap=http://bootstrap:8080",
-      "--auto-demo"
-    ]
-    depends_on:
-      bootstrap:
-        condition: service_healthy
+    command: >
+      ./bin/peer 
+      --name=coordinator 
+      --port=9001 
+      --coordinator 
+      --zk 
+      --zkdb=/data/zk 
+      --bootstrap=http://bootstrap:8080
     ports:
       - "9001:9001"
-    networks:
-      - p2pnet
-    environment:
-      - PEER_ROLE=coordinator
-
-  # Worker nodes
-  worker1:
-    build: .
-    command: [
-      "--name=worker-1",
-      "--port=9002", 
-      "--worker",
-      "--bootstrap=http://bootstrap:8080"
-    ]
+    volumes:
+      - ./data/coordinator:/data
     depends_on:
-      bootstrap:
-        condition: service_healthy
-    ports:
-      - "9002:9002"
+      - bootstrap
     networks:
-      - p2pnet
+      - zk-network
+
+  worker-1:
+    build: .
+    command: >
+      ./bin/peer 
+      --name=worker-1 
+      --port=9101 
+      --worker 
+      --zk 
+      --zkdb=/data/zk 
+      --bootstrap=http://bootstrap:8080
+    volumes:
+      - ./data/worker-1:/data
+    depends_on:
+      - bootstrap
+    networks:
+      - zk-network
+    deploy:
+      replicas: 5
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+
+  simulator:
+    build: .
+    command: >
+      ./bin/simulator 
+      --coordinator=coordinator:9001 
+      --tps=50 
+      --batch-size=100 
+      --fraud-rate=0.02 
+      --duration=0
+    depends_on:
+      - coordinator
+      - worker-1
+    networks:
+      - zk-network
+
+  monitor:
+    build: .
+    command: ./scripts/monitor.sh
     environment:
-      - PEER_ROLE=worker
-
-  # worker2:
-  #   build: .
-  #   command: [
-  #     "--name=worker-2",
-  #     "--port=9003", 
-  #     "--worker",
-  #     "--bootstrap=http://bootstrap:8080"
-  #   ]
-  #   depends_on:
-  #     bootstrap:
-  #       condition: service_healthy
-  #   ports:
-  #     - "9003:9003"
-  #   networks:
-  #     - p2pnet
-  #   environment:
-  #     - PEER_ROLE=worker
-
-  # worker3:
-  #   build: .
-  #   command: [
-  #     "--name=worker-3",
-  #     "--port=9004", 
-  #     "--worker",
-  #     "--bootstrap=http://bootstrap:8080"
-  #   ]
-  #   depends_on:
-  #     bootstrap:
-  #       condition: service_healthy
-  #   ports:
-  #     - "9004:9004"
-  #   networks:
-  #     - p2pnet
-  #   environment:
-  #     - PEER_ROLE=worker
-
-  # worker4:
-  #   build: .
-  #   command: [
-  #     "--name=worker-4",
-  #     "--port=9005", 
-  #     "--worker",
-  #     "--bootstrap=http://bootstrap:8080"
-  #   ]
-  #   depends_on:
-  #     bootstrap:
-  #       condition: service_healthy
-  #   ports:
-  #     - "9005:9005"
-  #   networks:
-  #     - p2pnet
-  #   environment:
-  #     - PEER_ROLE=worker
+      - BOOTSTRAP_URL=http://bootstrap:8080
+      - COORDINATOR_URL=http://coordinator:9001
+    depends_on:
+      - coordinator
+    networks:
+      - zk-network
 
 networks:
-  p2pnet:
+  zk-network:
     driver: bridge
 
-# Optional: Add volumes for persistent data
 volumes:
-  bootstrap_data:
+  zk-data:

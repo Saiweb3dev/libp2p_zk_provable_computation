@@ -370,6 +370,10 @@ func (ts *TaskService) getNextWorker() (peer.ID, error) {
 
 	return worker, nil
 }
+// GetNextWorker returns the next worker using round-robin selection
+func (ts *TaskService) GetNextWorker() (peer.ID, error) {
+    return ts.getNextWorker()
+}
 
 // Task computation methods
 func (ts *TaskService) checkPrime(n int64) (bool, error) {
